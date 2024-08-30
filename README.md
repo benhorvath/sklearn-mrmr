@@ -1,5 +1,7 @@
 # `sklearn-mrmr`: MRMR feature selection for sklearn
 
+_**Release date**: August 30, 2024, v.0.1_
+
 This repo provides a Python library that implements `scikit-learn`-compatible feature selection via Minimum Redunancy - Maximum Relevance. It aims to work seamlessly with `scikit-learn`'s pipelines, hyperparameter optimization, and models. Both regression and classification tasks are supported. The number of features selected by MRMR is itself a hyperparameter, and can be tuned using `scikit-learn`'s pipeline and grid search functionality.
 
 Other repos on Github implement MRMR in Python, they often lack compatibility with `scikit-learn`, limiting their utility.
