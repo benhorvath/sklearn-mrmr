@@ -30,6 +30,10 @@ python setup.py install
 
 See [demo.py](https://github.com/benhorvath/sklearn-MRMR/blob/main/demo.ipynb) for a example of how to use this library with `scikit-learn`'s functionality.
 
+## Contact
+
+Feel free to e-mail me any problems or thoughts: [benhorvath@gmail.com](mailto:benhorvath@gmail.com)
+
 ## References
 
 * Original MRMR paper: "[Minimum redundancy feature selection from microarray gene expression data](https://pubmed.ncbi.nlm.nih.gov/15852500/)"
