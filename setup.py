@@ -7,7 +7,7 @@ setup(
     name='sklearn-mrmr',
     version='0.1',
     packages=find_packages(),
-    description='sklearn-compatible implementation of mRMR feature selection',
+    description='scikit-learn-compatible implementation of MRMR feature selection',
     author='Benjamin Horvath',
     author_email='benhorvath@gmail.com',
     url='https://github.com/benhorvath/sklearn-mrmr/',
