@@ -1,22 +1,36 @@
 """
-Main implementation for slearn-compatible feature selection via mRMR.
+Main implementation for sklearn-compatible feature selection via mRMR.
 """
+
+from typing import List, Tuple, Union
 
 import numpy as np
 import pandas as pd
 
-from scipy import stats
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.feature_selection import SelectKBest, mutual_info_classif, \
-    mutual_info_regression, f_classif, f_regression
-from sklearn.preprocessing import LabelEncoder
+from sklearn.feature_selection import f_classif, f_regression, \
+    mutual_info_classif, mutual_info_regression
 from sklearn.utils import check_X_y
 
 
-def calculate_mi_mrmr(X: np.ndarray, y: np.ndarray, n_jobs: int = 1, 
-                      operation: str = 'difference', **kwargs) -> np.ndarray:
+def calculate_mi_mrmr(
+    X: pd.DataFrame, 
+    y: pd.Series, 
+    k: int, 
+    n_jobs: int = 1,
+    operation: str = 'difference',
+) -> List[Tuple[np.ndarray, List, int]]:
     """
-    Calculate MRMR (Minimum Redundancy Maximum Relevance) scores for feature selection.
+    Selects the top `k` features of a dataset using the Minimum Redundancy
+    Maximum Relevance (MRMR) algorithm (original mutual information design).
+    
+    The MRMR algorithm selects the subset of features that are both highly
+    relevant to the target variable as well as minimally redundant with
+    respect to each other. This function computes both relevance and
+    redundancy using mututal information. This calculation can be slow, so an
+    argument exists to run it in parallel `n_jobs`. Users can choose between
+    using subtraction or division to balance the trade-off between relevance 
+    and redundancy. Both regression and classification tasks are supported.
 
     Parameters
     ----------
@@ -25,113 +39,173 @@ def calculate_mi_mrmr(X: np.ndarray, y: np.ndarray, n_jobs: int = 1,
     
     y : np.ndarray
         The target values with shape (n_samples,).
-    
+        
+    k : int
+        Number of features to select.
+
     n_jobs : int, default=1
-        Number of jobs to run in parallel.
+        Number of jobs to calculate MI.
     
     operation : str, default='difference'
-        The operation to combine relevance and redundancy. Valid options are 'difference' or 'quotient'.
-    
-    kwargs : dict
-        Additional parameters to pass to the mutual information functions.
+        Whether subtract or divide relevancy and redundancy.
 
     Returns
     -------
     mrmr_scores : np.ndarray
-        The MRMR scores for each feature.
+        The MRMR scores of selected features.
+
+    selected_features : list
+        Names of selected features.
+
+    n_features_in : int
+        Number of features in input data.
     """
-
-    def compute_redundancy(i, j):
-        """ Helper function to clean up parallel code."""
-        return score_func(X[:, [i]], X[:, [j]].flatten())
-
+    
+    X, y = check_X_y(X, y)
+    
+    p = X.shape[1]
+    
     is_classification = np.issubdtype(y.dtype, np.str_)
     
     if is_classification:
-        score_func = lambda X, y: mutual_info_classif(X, y, n_jobs=n_jobs, **kwargs)
+        score_func = lambda X, y: mutual_info_classif(X, y, n_jobs=n_jobs)
     else:
-        score_func = lambda X, y: mutual_info_regression(X, y, n_jobs=n_jobs, **kwargs)
-
-    feature_indices = list(range(X.shape[1]))
-
-    mrmr_scores = np.zeros(len(feature_indices))
-
-    for i in feature_indices:
-
-        other_feature_indices = feature_indices.copy()
-        other_feature_indices.remove(i)
-
-        relevance = score_func(X[:, [i]], y)
-
-        redundancy = Parallel(n_jobs=n_jobs)(delayed(compute_redundancy)(i, j) for j in other_feature_indices)
-        redundancy = np.mean(redundancy)
-
-        if operation == 'difference':
-            mrmr_score = relevance - redundancy
-        else:
-            mrmr_score = relevance / redundancy
+        score_func = lambda X, y: mutual_info_regression(X, y, n_jobs=n_jobs)
         
-        mrmr_scores[i] = mrmr_score
+    relevance_scores = score_func(X, y)
+    
+    # Initialize containers for loop
+    redundancy_scores = np.ones([p, p])
+    mrmr_scores = []
+    selected_features = []
+    not_selected = list(range(p))
+    
+    for i in range(k):
+    
+        if i > 0:
+            last_selected = selected_features[-1]
+            redundancy_scores[not_selected, last_selected] = score_func(X[:, not_selected], X[:, last_selected])
+    
+        relevance_score = relevance_scores[not_selected]
+    
+        if selected_features:
+            redundancy_score = np.nanmean(redundancy_scores[not_selected][:, selected_features], axis=1)
+        else:
+            redundancy_score = np.ones(len(not_selected))
+    
+        # Compare relevance and redundancy
+        if operation == 'difference':
+            score = relevance_score - redundancy_score
+        elif operation == 'quotient':
+            score = relevance_score / redundancy_score
+        else:
+            raise ValueError(f'Invalid method: {operation}.')
+        
+        best = np.argmax(score)
+        best_feature = not_selected[best]
+        best_score = score[best]
+    
+        selected_features.append(best_feature)
+        not_selected.remove(best_feature)
+        mrmr_scores.append(best_score)
+    
+    return mrmr_scores, selected_features, p
 
-    return mrmr_scores
-
-def calculate_ftest_mrmr(X: np.ndarray, y: np.ndarray, operation: str = 'difference') -> np.ndarray:
+def calculate_ftest_mrmr(
+    X: pd.DataFrame, 
+    y: pd.Series, 
+    k: int,
+    operation: str = 'difference'
+) -> List[Tuple[np.ndarray, List, int]]:
     """
-    Short description
+    Selects the top `k` features of a dataset using the Minimum Redundancy Maximum Relevance 
+    (MRMR) algorithm (F-test variant).
+
+    The MRMR algorithm selects the subset of features that are both highly relevant to the target
+    variable as well as minimally redundant with respect to each other. This function computes 
+    relevance using the F-statistic, and redundancy based on correlation, ensuring speedy
+    calculation. Users can choose between using subtraction or division to balance the trade-off
+    between relevance and redundancy. This function can be used for both regression and
+    classification.
 
     Parameters
     ----------
-    X : np.ndarray
+    X : pd.DataFrame
         The input samples with shape (n_samples, n_features).
     
-    y : np.ndarray
+    y : pd.Series
         The target values with shape (n_samples,).
-    
+
+    k : int
+        Number of features to select.
+
     operation : str, default='difference'
-        The operation to combine relevance and redundancy. Valid options are 'difference' or 'quotient'.
+        Whether to use subtraction or division between relevancy and redundancy.
 
     Returns
     -------
     mrmr_scores : np.ndarray
-        The MRMR scores for each feature.
-    """
+        The MRMR scores of selected features.
 
+    selected_features : list
+        Names of selected features.
+
+    n_features_in : int
+        Number of features in input data.
+    """
+    
+    X, y = check_X_y(X, y)
+    
+    p = X.shape[1]
+    
     is_classification = np.issubdtype(y.dtype, np.str_)
-        
+    
+    # Prepare relevance scores
     if is_classification:
         relevance_func = lambda X, y: f_classif(X, y)[0]
     else:
         relevance_func = lambda X, y: f_regression(X, y)[0]
+
+    relevance_scores = relevance_func(X, y)
     
-    feature_indices = list(range(X.shape[1]))
+    # Initialize containers for loop
+    redundancy_scores = np.ones([p, p])
+    selected_features = []
+    not_selected = list(range(p))
+    mrmr_scores = []
     
-    redundancy_func = lambda X, y: stats.pearsonr(X, y)[0]  # TODO: kwargs, requires one hot encoded
-
-    mrmr_scores = np.zeros(len(feature_indices))
-
-    for i in feature_indices:
-
-        other_feature_indices = feature_indices.copy()
-        other_feature_indices.remove(i)
-
-        relevance = relevance_func(X[:, [i]], y)
-
-        redundancy = []
-        for j in other_feature_indices:
-            redundancy_ij = redundancy_func(X[:, i], X[:, [j]].flatten())
-            redundancy.append(redundancy_ij)
-        redundancy = np.mean(redundancy)
-
-        if operation == 'difference':
-            mrmr_score = relevance - redundancy
-        else:
-            mrmr_score = relevance / redundancy
+    for i in range(k):
         
-        mrmr_scores[[i]] = mrmr_score
+        if i > 0:
+            last_selected = selected_features[-1]
+            # Calculate correlation matrix of the relevant columns
+            redundancy_scores[not_selected, last_selected] = np.abs(np.corrcoef(X[:, not_selected].T, X[:, last_selected].T)[:-1, -1])
+            
+        relevance_score = relevance_scores[not_selected]
+        
+        if selected_features:
+               redundancy_score = np.nanmean(redundancy_scores[not_selected][:, selected_features], axis=1)
+        else:
+            redundancy_score = np.ones(len(not_selected))
+            
+        # Compare relevance and redundancy
+        if operation == 'difference':
+            score = relevance_score - redundancy_score
+        elif operation == 'quotient':
+            score = relevance_score / redundancy_score
+        else:
+            raise ValueError(f"Invalid method: {operation}.")
+            
+        best = np.argmax(score)
+        best_feature = not_selected[best]
+        best_score = score[best]
+    
+        selected_features.append(best_feature)
+        not_selected.remove(best_feature)
+        mrmr_scores.append(best_score)
+        
+    return mrmr_scores, selected_features, p
 
-    return mrmr_scores
-
-# TODO: Need to pass kwargs to here -- probably pass n_jobs through kwargs too
 class MRMRFeatureSelector(BaseEstimator, TransformerMixin):
     """
     MRMR (Minimum Redundancy Maximum Relevance) feature selector.
@@ -140,10 +214,10 @@ class MRMRFeatureSelector(BaseEstimator, TransformerMixin):
 
     Parameters
     ----------
-    n_features_to_select : int, default=10
+    n_features_to_select : int, default=5
         Number of features to select.
 
-    method : str, default='mi'
+    method : str, default='ftest'
         Method to use for MRMR feature selection. Valid choices are:
         ['mi', 'mi_quotient', 'ftest', 'ftest_quotient'].
 
@@ -152,14 +226,14 @@ class MRMRFeatureSelector(BaseEstimator, TransformerMixin):
 
     Attributes
     ----------
-    scores_ : array-like, shape (n_features,)
-        Scores of features.
+    scores_ : array-like, shape (n_features_to_select,)
+        MRMR scores of selected features.
 
     n_features_in_ : int
-        Number of features seen during `fit`.
+        Number of features in input dataframe.
 
     selected_features_ : array-like, shape (n_features_to_select,)
-        Boolean mask of selected features.
+        Array of names of selected features.
     """
 
     VALID_METHODS = ['mi', 'mi_quotient', 'ftest', 'ftest_quotient']
@@ -170,10 +244,12 @@ class MRMRFeatureSelector(BaseEstimator, TransformerMixin):
         'n_jobs': [int]
     }
 
-    def __init__(self, 
-                 n_features_to_select: int = 10, 
-                 method: str = 'mi', 
-                 n_jobs: int = 1) -> None:
+    def __init__(
+        self, 
+        n_features_to_select: int = 5, 
+        method: str = 'ftest', 
+        n_jobs: int = 1
+    ) -> None:
         self.n_features_to_select = n_features_to_select
         self.method = method
         self.n_jobs = n_jobs
@@ -187,6 +263,8 @@ class MRMRFeatureSelector(BaseEstimator, TransformerMixin):
     def fit(self, X: pd.DataFrame, y: pd.Series) -> 'MRMRFeatureSelector':
         """
         Fit the MRMR feature selector.
+
+        Methodology is chosen by user-specified parameters.
 
         Parameters
         ----------
@@ -202,29 +280,27 @@ class MRMRFeatureSelector(BaseEstimator, TransformerMixin):
             Returns self.
         """
 
-        X, y = check_X_y(X, y)
-
         if self.method == 'mi':
-            score_func = lambda X, y: calculate_mi_mrmr(X, y, n_jobs=self.n_jobs)
+            results = calculate_mi_mrmr(X, y, k=self.n_features_to_select,
+                                        n_jobs=self.n_jobs)
         elif self.method == 'mi_quotient':
-            score_func = lambda X, y: calculate_mi_mrmr(X, y, n_jobs=self.n_jobs, operation='quotient')
+            results = calculate_mi_mrmr(X, y, k=self.n_features_to_select,
+                                        n_jobs=self.n_jobs, operation='quotient')
         elif self.method == 'ftest':
-            score_func = lambda X, y: calculate_ftest_mrmr(X, y)
+            results = calculate_ftest_mrmr(X, y, k=self.n_features_to_select)
         elif self.method == 'ftest_quotient':
-            score_func = lambda X, y: calculate_ftest_mrmr(X, y, operation='quotient')
+            results = calculate_ftest_mrmr(X, y, k=self.n_features_to_select,
+                                           operation='quotient')
         else:
-            raise ValueError(f'Unsupported method: {self.method}')
-
-        selector = SelectKBest(score_func, k=self.n_features_to_select)
-        selector.fit(X, y)
-
-        self.scores_ = selector.scores_
-        self.n_features_in_ = selector.n_features_in_
-        self.selected_features_ = selector.get_support()
+            raise ValueError(f'Invalid method: {self.method}.')
+    
+        self.scores_ = results[0]
+        self.selected_features_ = results[1]
+        self.n_features_in_ = results[2]
 
         return self
     
-    def transform(self, X: pd.DataFrame) -> np.ndarray:
+    def transform(self, X: pd.DataFrame) -> Union[pd.DataFrame, np.ndarray]:
         """
         Transform the input samples by selecting the features.
 
@@ -235,11 +311,12 @@ class MRMRFeatureSelector(BaseEstimator, TransformerMixin):
 
         Returns
         -------
-        X_transformed : np.ndarray
-            The transformed samples.
+        X_transformed : Union[pd.DataFrame, np.ndarray]
+            The transformed sample. Will return as the same type of X.
         """
         if type(X) == pd.DataFrame:
-            return X.loc[:, self.selected_features_]
+            selected_columns = X.columns[self.selected_features_]
+            return X[selected_columns]
         else:
             return X[:, self.selected_features_]
     
@@ -257,8 +334,8 @@ class MRMRFeatureSelector(BaseEstimator, TransformerMixin):
 
         Returns
         -------
-        X_transformed : np.ndarray
-            The transformed samples.
+        X_transformed : Union[pd.DataFrame, np.ndarray]
+            The transformed sample. Will return as the same type of X.
         """
         self.fit(X, y)
         return self.transform(X)

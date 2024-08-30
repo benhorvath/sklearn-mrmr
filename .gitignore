@@ -1,3 +1,10 @@
+demo_gold.ipynb
+demo_old.ipynb
+demo2.ipynb
+demo.ipynb
+data/*
+.venv/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
