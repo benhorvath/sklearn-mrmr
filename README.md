@@ -24,7 +24,7 @@ python setup.py install
 
 ## Example
 
-See `demo.py` for a example of how to use this library with `sklearn`'s functionality.
+See [https://github.com/benhorvath/sklearn-mrmr/blob/main/demo.ipynb](demo.py) for a example of how to use this library with `sklearn`'s functionality.
 
 ## References
 
