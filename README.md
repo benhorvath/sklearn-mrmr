@@ -8,7 +8,7 @@ Other repos on Github implement MRMR in Python, they often lack compatibility wi
 
 MRMR evaluates a feature's score based on its _relevance_ to the target variable and its _redundancy_ with other features. The goal is to select the features that have strong relationships with the target variable, and also minimally redundant.
 
-Four variants of MRMR are implemented. The canonical variant uses mututal information (MI) to calculate redundancy and relevance. However, since MI can be an resource-heavy process, other formulations have been proposed. (Although this library use's `scikit-learn`'s implementaiton of mututal information, which is quite optimized and offers parallel processing.) A second variant was developed, that uses the F-test to calculate relevance and Pearson correlation to calculate redundancy. This proves to be much faster, and without a clear loss in performance. Additionally, variants may use substraction or division. 
+Four variants of MRMR are implemented. The canonical variant uses mututal information (MI) to calculate redundancy and relevance. However, since MI can be an resource-heavy process, other formulations have been proposed. (Although this library uses `scikit-learn`'s implementation of mututal information, which is quite optimized and offers parallel processing.) A second variant was developed, that uses the F-test to calculate relevance and Pearson correlation to calculate redundancy. This proves to be much faster, and without a clear loss in performance. Additionally, variants may use substraction or division. 
 
 Variants using subtraction:
 
@@ -16,7 +16,7 @@ MI: $$f^{canonical}(X_i) = MI(Y, X_i) - \frac{1}{S} \sum_{X_s \in S} MI(X_s, X_i
 
 F-test: $$f^{Ftest}(X_i) = F(Y, X_i) - \frac{1}{S} \sum_{X_s \in S} \rho(X_s, X_i)$$
 
-Note that MRMR is not guaranteed to improve your model's performance. As with anthing ML, its effectiveness depends on your data and modeling strategy. My (anecdotal) experience seems to suggest that MRMR is particularly beneficial in scenarios involving high model complexity / many correlated features. The benefit can come as either improved performance or decreased variance.
+Note that MRMR is not guaranteed to improve your model's performance. As with anything ML, its effectiveness depends on your data and modeling strategy. My (anecdotal) experience seems to suggest that MRMR is particularly beneficial in scenarios involving high model complexity / many correlated features. The benefit can come as either improved performance or decreased variance.
 
 ## Installation
 

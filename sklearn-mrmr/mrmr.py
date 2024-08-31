@@ -158,7 +158,8 @@ def calculate_ftest_mrmr(
     
     p = X.shape[1]
     
-    is_classification = np.issubdtype(y.dtype, np.str_)
+    # is_classification = np.issubdtype(y.dtype, np.str_)
+    is_classification = True
     
     # Prepare relevance scores
     if is_classification:
