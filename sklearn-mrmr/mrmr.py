@@ -1,5 +1,14 @@
 """
-Main implementation for sklearn-compatible feature selection via mRMR.
+Provides a Python library that implements scikit-learn-compatible feature
+selection via Minimum Redunancy - Maximum Relevance. It aims to work
+seamlessly with scikit-learn's pipelines, hyperparameter optimization, and
+models. Both regression and classification tasks are supported.
+
+The number of features selected by MRMR is itself a hyperparameter, and can be
+tuned using scikit-learn's pipeline and grid search functionality.
+
+Author: Benjamin Horvath <benhorvath@gmail.com>
+Github: https://github.com/benhorvath/sklearn-mrmr
 """
 
 from typing import List, Tuple, Union
