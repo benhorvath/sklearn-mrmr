@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-with open('recommendations.txt') as f:
+with open('requirements.txt') as f:
     recommendations = f.read().splitlines()
 
 setup(
